@@ -9,14 +9,17 @@ class CustomerAdmin(admin.ModelAdmin):
 @admin.register(Invoice)
 class InvoiceAdmin(admin.ModelAdmin):
     list_display = ('customer', 'invoice_type', 'total_amount', 'paid', 'last_update_date_time', 'save_by')
-
-@admin.register(Article)
-class ArticleAdmin(admin.ModelAdmin):
-    list_display = ('invoice', 'product', 'quantity', 'unit_price')
+    readonly_fields = ('total_amount',)
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'unit_price', 'description', 'created_date', 'save_by') 
+    list_display = ('name', 'unit_price', 'description', 'created_date', 'save_by', 'quantity_in_stock', 'quantity_seiled',) 
+
+@admin.register(Article)
+class ArticleAdmin(admin.ModelAdmin):
+    list_display = ('invoice', 'product', 'quantity','total_price', 'unit_price')
+    readonly_fields = ('total_price', 'unit_price')
+
 
 admin.site.site_header = "Invoice Management System Admin"
 admin.site.site_title = "Invoice Management System Admin Portal"
