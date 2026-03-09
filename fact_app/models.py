@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Sum
+import re
 
 
 class Customer(models.Model):
@@ -32,11 +33,14 @@ class Customer(models.Model):
         verbose_name_plural = "Customers"
     def __str__(self):
         return self.name
-    
-   """ def valideCustomer(){
+  
+    def valideCustomer(self):
+
+        if(re.match(self.regexEmail,self.email)):
+            return True
+               
 
 
-    }"""
     
 class Invoice (models.Model):
     """
@@ -45,15 +49,15 @@ class Invoice (models.Model):
     author: mezatiogeril@gmail.com
     """
     INVOICE_TYPE =[
-        ('R', 'Reçu'),
-        ('F', 'Facture'),
-        ('P', 'Proforma_facture'),
+        ('R', 'RECEIPT'),
+        ('I', 'INVOICE'),
+        ('P', 'PROFORMA INVOICE'),
     ]
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
     save_by = models.ForeignKey(User, on_delete=models.PROTECT)
     invoice_date_time = models.DateTimeField(auto_now_add=True)
     total_amount = models.DecimalField(max_digits=100000, decimal_places=3, default= 0)
-    last_update_date_time = models.DateTimeField(null=True, blank=True)
+    last_update_date_time = models.DateTimeField(null=True, blank=True,auto_now_add=True)
     paid = models.BooleanField(default=False)
     invoice_type = models.CharField(max_length=1, choices=INVOICE_TYPE)
     comments = models.TextField(blank=True, null=True, max_length=500)
@@ -68,12 +72,6 @@ class Invoice (models.Model):
         self.total_amount = sum(article.get_total_price for article in self.articles.all())
         return self.total_amount
 
-    def refresh_total_amount(self, save=True):
-        self.total_amount = self.articles.aggregate(total=Sum("total_price"))["total"] or 0
-        if save:
-            self.save(update_fields=["total_amount"])
-        return self.total_amount
-    
 
 class Product(models.Model):
     """
@@ -196,7 +194,6 @@ class Article(models.Model):
             current_product.save(update_fields=["quantity_in_stock"])
 
             super().save(*args, **kwargs)
-            self.invoice.refresh_total_amount(save=True)
 
     def delete(self, *args, **kwargs):
         with transaction.atomic():
@@ -206,4 +203,4 @@ class Article(models.Model):
 
             invoice = self.invoice
             super().delete(*args, **kwargs)
-            invoice.refresh_total_amount(save=True)
+          

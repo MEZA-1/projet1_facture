@@ -6,7 +6,7 @@
 {% block content %}
 <br></br>
 <div class="row">
-    <a href="#" class="btn col-md-4 btn-primary">
+    <a href="{% url 'add-invoice' %}" class="btn col-md-4 btn-primary">
         Register a new Invoice <span class="badge text-bg-secondary"></span>
     </a>
     <a href="#" class=" col-md-4 ">
@@ -41,7 +41,7 @@
             <th scope="row">{{ facture.id }}</th>
             <td>{{ facture.customer.name }}</td>
             <td>{{ facture.invoice_date_time }}</td>
-            <td>{{ facture.total_amount }}</td>
+            <td>{{ facture.get_total_amount }}</td>
             <td>
                 {% if facture.paid %}
                 <img src="{% static 'images/icon-yes.svg' %}" alt="true">

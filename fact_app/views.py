@@ -53,3 +53,91 @@ class AddCustomerView(View):
             messages.error(request, f"Sorry our system is detecting the following issues {e}")
        
         return redirect("home")
+
+
+class AddInvoiceView(View):
+    """add new invoice"""
+
+    template_name = "add_invoice.html"
+
+    def get(self, request, *args, **kwargs):
+        customers = Customer.objects.select_related('save_by').all().order_by("name")
+        products = Product.objects.all().order_by("name")
+        context = {"customers": customers, "products": products}
+        return render(request, self.template_name, context)
+
+    def post(self, request, *args, **kwargs):
+        customer_id = request.POST.get("customer")
+        invoice_type = request.POST.get("invoice_type")
+        comments = request.POST.get("comments")
+        product_ids = request.POST.getlist("product")
+        quantities = request.POST.getlist("qty")
+
+        if not customer_id or not invoice_type:
+            messages.error(request, "Please select a customer and an invoice type.")
+            return redirect("add-invoice")
+
+        line_items = []
+        for product_id, quantity in zip(product_ids, quantities):
+            if not product_id or not quantity:
+                continue
+            try:
+                line_items.append((int(product_id), int(quantity)))
+            except (TypeError, ValueError):
+                messages.error(request, "Invalid product or quantity.")
+                return redirect("add-invoice")
+
+        if not line_items:
+            messages.error(request, "Please add at least one product.")
+            return redirect("add-invoice")
+
+        try:
+            customer = Customer.objects.get(pk=customer_id)
+            with transaction.atomic():
+                invoice = Invoice.objects.create(
+                    customer=customer,
+                    save_by=request.user,
+                    invoice_type=invoice_type,
+                    comments=comments,
+                )
+                total_amount = 0
+
+                for product_id, quantity in line_items:
+
+                    product = Product.objects.get(pk=product_id)
+                    
+                    unit_price = product.unit_price
+                    
+                    total_price = unit_price * quantity
+                    
+                    article = Article.objects.create(
+                        invoice=invoice,
+                        product=product,
+                        quantity=quantity,
+                        unit_price=unit_price,
+                        total_price=total_price,
+                        )
+                    total_amount += total_price
+                invoice.total_amount = total_amount
+                invoice.save(update_fields=["total_amount"])
+                print(f"Invoice {invoice.id} created with total amount: {total_amount}")
+               
+
+            messages.success(request, "Invoice created successfully.")
+        except Exception as e:
+            messages.error(request, f"Unable to create invoice: {e}")
+        return redirect("home")
+
+
+
+"""def product_info(request, product_id):
+    product = get_object_or_404(Product, pk=product_id)
+    return JsonResponse(
+        {
+            "id": product.id,
+            "name": product.name,
+            "unit_price": float(product.unit_price),
+            "quantity_in_stock": product.quantity_in_stock,
+            "quantity_seiled": product.quantity_seiled,
+        }
+    )"""
