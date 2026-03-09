@@ -3,23 +3,44 @@ from django.http import JsonResponse
 from django.views import View
 from .models import *
 from django.contrib import messages
-
+from .utils import pagination
+ 
 # Create your views here.
 
 class HomeView(View):
     """Main view"""
 
     template_name = "index.html"
-
+    invoices = Invoice.objects.select_related("customer", "save_by").all()
+    context = {"invoices": invoices}
   
 
     def get(self, request, *args, **kwags):
-        invoices = Invoice.objects.select_related("customer", "save_by").all()
-        context = {"invoices": invoices}
-        return render(request, self.template_name, context)
+        items = pagination(request, self.invoices)
+        self.context["invoices"] = items
+        return render(request, self.template_name, self.context)
     
     def post(self, request, *args, **kwags):
         # Handle POST request if needed, then redirect to avoid resubmission on refresh.
+        #mofify
+
+        if request.POST.get('id_modified'):
+            
+            paid = request.POST.get('modified')
+
+            try:
+                obj = Invoice.objects.get(id=request.POST.get('id_modified'))
+                if paid == 'true':
+                    obj.paid = True
+                else:
+                     obj.paid =False
+                obj.save()
+                messages.success(request," Change mode successfully. ")
+            except Exception as e:
+                messages.error(request, f" sorry the following error has occured {e}")
+
+        items = pagination(request, self.invoices)
+        self.context["invoices"] = items
         return redirect("home")
 
 
