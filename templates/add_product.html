@@ -1,0 +1,47 @@
+{% extends 'base.html'%}
+
+{% block content %}
+
+<br> <br>
+<h1 class="text-center text-capitalize mx-10 bg-dark text-white">Register a new Product</h1>
+
+<form method="post">
+    {% csrf_token %}
+
+    <div class="form-row">
+        <div class="form-group col-md-6">
+            <label for="name">Name</label>
+            <input type="name" required name="name" class="form-control" id="name"
+                placeholder="the name of product">
+        </div>
+
+        <div class="form-group col-md-6">
+            <label for="description">description</label>
+            <input type="text" required name="description" class="form-control" id="description" placeholder="description of the product">
+        </div>
+
+    </div>
+
+    <div class="form-row">
+        <div class="form-group col-md-4">
+            <label for="Unit_price">Unit price</label>
+            <input type="number" required name="Unit_price" class="form-control" id="Unit_price" placeholder="Unit price of the product">
+        </div>
+
+
+        <div class="form-group col-md-4">
+            <label for="quantity_stock">Quantity in stock</label>
+            <input type="number" required name="quantity_stock" class="form-control" id="quantity_stock" placeholder="quantity stock of the product">
+        </div>
+
+        <div class="form-group col-md-4">
+            <label for="quantity_seiled">Quantity seiled</label>
+            <input type="number" required name="quantity_seiled" class="form-control" id="quantity_seiled" placeholder="quantity seiled of the product">
+        </div>
+
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save</button>
+</form>
+
+{% endblock content %}

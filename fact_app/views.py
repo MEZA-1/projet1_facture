@@ -9,6 +9,11 @@ import pdfkit
 from django.template.loader import get_template
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.models import User
+from django.db.models import Sum, F
+from django.db.models.functions import TruncMonth
+from django.utils import timezone
+ 
  
 from .decorators import * 
 
@@ -211,6 +216,206 @@ def get_imvoice_pdf(request, *args, **kwargs):
 
     return response
 
+
+class AddproductView(LoginRequiredSuperuserMixin, View):
+    """add new cistomer,"""
+    
+    template_name = "add_product.html"
+    def get(self,request, *args, **kwargs):
+        
+        return render(request, self.template_name)
+    
+    def post(self,request, *args, **kwargs):
+        name = (request.POST.get("name") or "").strip()
+        description = request.POST.get("description")
+        unit_price = request.POST.get("Unit_price")
+        quantity_in_stock = request.POST.get("quantity_stock")
+        quantity_seiled = request.POST.get("quantity_seiled")
+
+        if not name:
+            messages.error(request, "Product name is required.")
+            return redirect("add-product")
+
+        if Product.objects.filter(name__iexact=name).exists():
+            messages.error(request, "This product already exists in the database.")
+            return redirect("add-product")
+
+        try:
+            quantity_in_stock_value = int(quantity_in_stock)
+            quantity_seiled_value = int(quantity_seiled)
+        except (TypeError, ValueError):
+            messages.error(request, "Quantity values must be numbers.")
+            return redirect("add-product")
+
+        if quantity_in_stock_value <= 0:
+            messages.error(request, "Quantity in stock must be greater than 0.")
+            return redirect("add-product")
+
+        if quantity_seiled_value >= quantity_in_stock_value:
+            messages.error(
+                request,
+                "Quantity seiled must be lower than quantity in stock.",
+            )
+            return redirect("add-product")
+
+        data = {
+            "name": name,
+            "description": description,
+            "unit_price": unit_price,
+            "quantity_in_stock": quantity_in_stock_value,
+            "quantity_seiled": quantity_seiled_value,
+            "save_by": request.user,
+        }
+        
+        try:
+            created_Product = Product.objects.create(**data)
+
+            if created_Product:
+                messages.success(request, "Product registered successfully.")
+            else:
+                messages.error(request, "Sorry, please try again the sent data is corrupt.")
+        except Exception as e:
+            messages.error(request, f"Sorry our system is detecting the following issues {e}")
+       
+        return redirect("home")
+
+
+class AddAdminView(LoginRequiredSuperuserMixin, View):
+    """create new superuser"""
+
+    template_name = "add_admin.html"
+
+    def get(self, request, *args, **kwargs):
+
+        if request.user.username != "meza":
+
+            messages.error(request, "Only user meza can access this page.")
+            
+            return redirect("home")
+        
+        return render(request, self.template_name)
+
+    def post(self, request, *args, **kwargs):
+
+        if request.user.username != "meza":
+            messages.error(request, "Only user meza can create admins.")
+            return redirect("home")
+
+        username = (request.POST.get("username") or "").strip()
+        email = (request.POST.get("email") or "").strip()
+        password = request.POST.get("password") or ""
+        confirm_password = request.POST.get("confirm_password") or ""
+
+        if not username or not password:
+            messages.error(request, "Username and password are required.")
+            return redirect("add-admin")
+
+        if password != confirm_password:
+            messages.error(request, "Passwords do not match.")
+            return redirect("add-admin")
+
+        if User.objects.filter(username__iexact=username).exists():
+            messages.error(request, "This username already exists.")
+            return redirect("add-admin")
+
+        if email and User.objects.filter(email__iexact=email).exists():
+            messages.error(request, "This email is already used.")
+            return redirect("add-admin")
+
+        try:
+            User.objects.create_superuser(
+                username=username,
+                email=email,
+                password=password,
+            )
+            messages.success(request, "Admin created successfully.")
+        except Exception as e:
+            messages.error(request, f"Unable to create admin: {e}")
+
+        return redirect("home")
+
+
+class ModifyProductStockView(LoginRequiredSuperuserMixin, View):
+    """modify product stock quantity"""
+
+    template_name = "modify_product.html"
+
+    def get(self, request, *args, **kwargs):
+        products = Product.objects.all().order_by("name")
+        return render(request, self.template_name, {"products": products})
+
+    def post(self, request, *args, **kwargs):
+        product_id = request.POST.get("product")
+        quantity_in_stock = request.POST.get("quantity_stock")
+
+        if not product_id:
+            messages.error(request, "Please select a product.")
+            return redirect("modify-product")
+
+        try:
+            product = Product.objects.get(pk=product_id)
+        except Product.DoesNotExist:
+            messages.error(request, "Product not found.")
+            return redirect("modify-product")
+
+        try:
+            quantity_in_stock_value = int(quantity_in_stock)
+        except (TypeError, ValueError):
+            messages.error(request, "Quantity in stock must be a number.")
+            return redirect("modify-product")
+
+        if quantity_in_stock_value <= 0:
+            messages.error(request, "Quantity in stock must be greater than 0.")
+            return redirect("modify-product")
+
+        try:
+            product.quantity_in_stock += quantity_in_stock_value
+            product.save(update_fields=["quantity_in_stock"])
+            messages.success(request, "Product stock updated successfully.")
+        except Exception as e:
+            messages.error(request, f"Unable to update product stock: {e}")
+
+        return redirect("home")
+
+class StatisticsView(LoginRequiredSuperuserMixin, View):
+    """Statistics dashboard"""
+
+    template_name = "statistics.html"
+
+    def get(self, request, *args, **kwargs):
+        customers_count = Customer.objects.count()
+        paid_count = Invoice.objects.filter(is_annuler=False, paid=True).count()
+        unpaid_count = Invoice.objects.filter(is_annuler=False, paid=False).count()
+
+        top_products = (
+            Article.objects.values("product__name")
+            .annotate(total_quantity=Sum("quantity"))
+            .order_by("-total_quantity")[:10]
+        )
+
+        stock_low = (
+            Product.objects.filter(quantity_in_stock__lte=F("quantity_seiled"))
+            .order_by("quantity_in_stock")
+        )
+
+        monthly_sales = (
+            Invoice.objects.filter(is_annuler=False)
+            .annotate(month=TruncMonth("invoice_date_time"))
+            .values("month")
+            .annotate(total=Sum("total_amount"))
+            .order_by("month")
+        )
+
+        context = {
+            "customers_count": customers_count,
+            "paid_count": paid_count,
+            "unpaid_count": unpaid_count,
+            "top_products": top_products,
+            "stock_low": stock_low,
+            "monthly_sales": monthly_sales,
+            "now": timezone.now(),
+        }
+        return render(request, self.template_name, context)
 
 
 
