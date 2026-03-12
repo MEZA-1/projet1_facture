@@ -1,28 +1,34 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.views import View
 from .models import *
 from django.contrib import messages
-from .utils import pagination
+from .utils import get_invoice, pagination
+import datetime
+import pdfkit
+from django.template.loader import get_template
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
  
+from .decorators import * 
+
 # Create your views here.
 
-class HomeView(View):
+class HomeView(LoginRequiredSuperuserMixin,View):
     """Main view"""
 
     template_name = "index.html"
-    invoices = Invoice.objects.select_related("customer", "save_by").all()
-    context = {"invoices": invoices}
   
 
     def get(self, request, *args, **kwags):
-        items = pagination(request, self.invoices)
-        self.context["invoices"] = items
-        return render(request, self.template_name, self.context)
+        invoices = Invoice.objects.select_related("customer", "save_by").filter(is_annuler=False).order_by('-invoice_date_time')
+        items = pagination(request, invoices)
+        context = {"invoices": items}
+        return render(request, self.template_name, context)
     
     def post(self, request, *args, **kwags):
         # Handle POST request if needed, then redirect to avoid resubmission on refresh.
-        #mofify
+        #mofify on invoice
 
         if request.POST.get('id_modified'):
             
@@ -32,19 +38,30 @@ class HomeView(View):
                 obj = Invoice.objects.get(id=request.POST.get('id_modified'))
                 if paid == 'true':
                     obj.paid = True
+                    obj.last_update_date_time =datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
                 else:
                      obj.paid =False
+                     obj.last_update_date_time =datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+
                 obj.save()
                 messages.success(request," Change mode successfully. ")
             except Exception as e:
                 messages.error(request, f" sorry the following error has occured {e}")
 
-        items = pagination(request, self.invoices)
-        self.context["invoices"] = items
+        # deleting invoice
+
+        if request.POST.get('id_supprimer'):
+            try:
+                obj = Invoice.objects.get(pk=request.POST.get('id_supprimer'))
+                obj.cancel()
+                
+                messages.success(request,'The invoice was cancelled successfully')
+            except Exception as e:
+                messages.error(request, f"sorry, the foolowing error has occured {e},")
+
         return redirect("home")
 
-
-class AddCustomerView(View):
+class AddCustomerView(LoginRequiredSuperuserMixin, View):
     """add new cistomer,"""
     
     template_name = "add_customer.html"
@@ -76,7 +93,7 @@ class AddCustomerView(View):
         return redirect("home")
 
 
-class AddInvoiceView(View):
+class AddInvoiceView(LoginRequiredSuperuserMixin, View):
     """add new invoice"""
 
     template_name = "add_invoice.html"
@@ -148,6 +165,55 @@ class AddInvoiceView(View):
         except Exception as e:
             messages.error(request, f"Unable to create invoice: {e}")
         return redirect("home")
+    
+class InvoiceVisualizationView(LoginRequiredSuperuserMixin, View):
+    """ this view helps to visualize the invoice"""
+
+    template_name = 'invoice.html'
+
+
+    def get(self, request, *args, **kwargs): 
+        
+        pk = kwargs.get('pk')
+
+        context = get_invoice(pk)
+
+        return render(request, self.template_name, context)
+    
+@superuser_required
+def get_imvoice_pdf(request, *args, **kwargs):
+    """generate de pdf file from html file"""
+    pk = kwargs.get('pk')
+
+    context = get_invoice(pk)
+
+    context['date']=datetime.datetime.today()
+
+    #get html fille
+    template = get_template('invoice_pdf.html')
+
+    # render html with context variable
+
+    html = template.render(context)
+    #option of pdf format
+    options = {
+        'page-size': 'letter',
+        'encoding': 'UTF-8',
+        'no-outline': None
+    }
+    #generate pdf
+
+    pdf = pdfkit.from_string(html, False, options)
+
+    response = HttpResponse(pdf, content_type='application/pdf')
+
+    response['Content-Disposition']= "attachement"
+
+    return response
+
+
+
+
 
 
 

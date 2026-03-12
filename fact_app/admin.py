@@ -8,7 +8,7 @@ class CustomerAdmin(admin.ModelAdmin):
 
 @admin.register(Invoice)
 class InvoiceAdmin(admin.ModelAdmin):
-    list_display = ('customer', 'invoice_type', 'total_amount', 'paid', 'last_update_date_time', 'save_by')
+    list_display = ('customer', 'invoice_type', 'total_amount', 'paid', 'last_update_date_time', 'invoice_date_time', 'save_by','is_annuler')
     readonly_fields = ('total_amount',)
 
 @admin.register(Product)

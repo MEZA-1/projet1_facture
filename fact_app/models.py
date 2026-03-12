@@ -4,15 +4,16 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Sum
 import re
-
+import datetime
+#from django.utils.translation import gettext_lazy as _
 
 class Customer(models.Model):
     """
     Name: customer model definition
     """
     SEX_CHOICES = [
-        ('M', 'Masculin'),
-        ('F', 'Feminin'),]
+        ('M', 'Male'),
+        ('F', 'Feminine'),]
     
     regexEmail = '/^[^\s@]+@[^\s@]+\.[^\s@]+$/'
     regexTelephone = '/^6\d{8}$/'
@@ -57,8 +58,9 @@ class Invoice (models.Model):
     save_by = models.ForeignKey(User, on_delete=models.PROTECT)
     invoice_date_time = models.DateTimeField(auto_now_add=True)
     total_amount = models.DecimalField(max_digits=100000, decimal_places=3, default= 0)
-    last_update_date_time = models.DateTimeField(null=True, blank=True,auto_now_add=True)
+    last_update_date_time = models.DateTimeField(null=True, blank=True)
     paid = models.BooleanField(default=False)
+    is_annuler = models.BooleanField(default=False)
     invoice_type = models.CharField(max_length=1, choices=INVOICE_TYPE)
     comments = models.TextField(blank=True, null=True, max_length=500)
     class Meta:
@@ -71,6 +73,18 @@ class Invoice (models.Model):
     def get_total_amount(self):
         self.total_amount = sum(article.get_total_price for article in self.articles.all())
         return self.total_amount
+
+    def cancel(self):
+        if self.is_annuler:
+            return
+        with transaction.atomic():
+            for article in self.articles.select_related("product").select_for_update():
+                product = article.product
+                product.quantity_in_stock += article.quantity
+                product.save(update_fields=["quantity_in_stock"])
+            self.is_annuler = True
+            self.last_update_date_time =datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+            self.save(update_fields=["is_annuler"])
 
 
 class Product(models.Model):

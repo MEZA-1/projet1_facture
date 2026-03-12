@@ -52,13 +52,13 @@
             <td>{{ facture.get_invoice_type_display }}</td>
 
             <td>
-               <a href="#" title="Detail" class="badge text-white bg-success">
+               <a href="{% url 'view-invoice' pk=facture.pk %}" title="Detail" class="badge text-white bg-success">
                   view
                </a>
                <button id="btn-invoice-sup" type="button" data-toggle="modal" data-target="#supprimer"
                   class="badge text-white bg-danger" title="Supprimer" data-id="{{ facture.pk }}"
                   data-customer="{{facture.customer.name}}">
-                  delete
+                  cancelled
                </button>
                <button id="btn-invoice-mod" type="button" data-toggle="modal" title="Modifier" data-target="#modifier"
                   data-id="{{facture.pk}}" data-customer="{{facture.customer.name}}"
@@ -150,7 +150,7 @@
    <div class="modal-dialog" role="document">
       <div class="modal-content">
          <div class="modal-header">
-            <h5 class="modal-title text-dark" id="sexampleModalLabel">Delete Invoice</h5>
+            <h5 class="modal-title text-dark" id="sexampleModalLabel">cancelled Invoice</h5>
             <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                <span aria-hidden="true">&times;</span>
             </button>
@@ -160,11 +160,11 @@
                {% csrf_token %}
                <input name="id_supprimer" type="hidden" id="id_supprimer">
                <label id="label_id_s" class="text-dark checkbox-inline"> <strong id="strong_id_s">Are you sure you want
-                     to delete the invoice ?</strong></label>
+                     to cancelled the invoice ?</strong></label>
 
                <div class="modal-footer">
                   <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                  <button type="submit" class="btn btn-danger">Delete</button>
+                  <button type="submit" class="btn btn-danger">cancelled</button>
                </div>
             </form>
          </div>
@@ -183,6 +183,13 @@
    let invoice_id = $(this).data('id');
    let customer = $(this).data('customer');
    $('#id_modified').val(invoice_id);
+ })
+
+ // deleting of invoice
+  $(document).on('click','#btn-invoice-sup', function(){
+   let invoice_id = $(this).data('id');
+   let customer = $(this).data('customer');
+   $('#id_supprimer').val(invoice_id);
  })
 
 </script>
